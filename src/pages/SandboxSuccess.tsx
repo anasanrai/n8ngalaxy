@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { SandboxSession } from '../types'
+import type { SandboxSession } from '../types'
 import Navbar from '../components/layout/Navbar'
 import Footer from '../components/layout/Footer'
 import { 
