@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Profile, Template, Purchase, SandboxSession, Subscription } from '../types';
+import type { Profile, Template, Purchase, SandboxSession, Subscription } from '../types';
 
 export type Database = {
   public: {
