@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, AlertCircle, Copy, ExternalLink, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { provisionSandbox } from '../lib/sandboxApi';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import type { SandboxSession } from '../types';
@@ -18,6 +17,7 @@ export default function SandboxSuccess() {
   const [status, setStatus] = useState<'provisioning' | 'success' | 'error'>('provisioning');
   const [credentials, setCredentials] = useState<{ url: string; user: string; pass: string; expiresAt: string } | null>(null);
   const [countdown, setCountdown] = useState(90);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     const sId = searchParams.get('session_id');
@@ -44,67 +44,50 @@ export default function SandboxSuccess() {
   useEffect(() => {
     if (!paramsLoaded || !sessionId || !orderId) return;
 
-    const setup = async () => {
+    let pollInterval: number;
+    const timeoutAt = Date.now() + 180000; // 3 minutes
+
+    const poll = async () => {
+      if (Date.now() > timeoutAt) {
+        setTimedOut(true);
+        clearInterval(pollInterval);
+        return;
+      }
+
       try {
-        // Fetch session to get tier and user
         const { data, error } = await supabase
           .from('sandbox_sessions')
-          .select('tier, user_id, status')
+          .select('status, n8n_url, n8n_username, n8n_password, expires_at')
           .eq('id', sessionId)
           .single();
 
+        if (error) return;
         const session = data as unknown as SandboxSession;
-        if (error || !session) throw new Error('Session not found');
-        
-        // If already active in DB because webhook fired or previous try succeeded, skip provision
-        if (session.status === 'active') {
-          // fetch credentials from db and set state
-          // Assuming active sessions have correct URLs stored in db
-          const { data } = await supabase
-            .from('sandbox_sessions')
-            .select('n8n_url, n8n_username, n8n_password, expires_at')
-            .eq('id', sessionId)
-            .single();
-          const activeSession = data as unknown as SandboxSession;
 
-          if (activeSession && activeSession.n8n_url) {
-            setCredentials({
-              url: activeSession.n8n_url,
-              user: activeSession.n8n_username || 'n8n',
-              pass: activeSession.n8n_password || '',
-              expiresAt: activeSession.expires_at,
-            });
-            setStatus('success');
-            return;
-          }
-        }
-
-        // Call our external API securely
-        const result = await provisionSandbox({
-          sessionId,
-          tier: session.tier,
-          userId: session.user_id,
-          orderId,
-        });
-
-        if (result.success) {
+        if (session.status === 'active' && session.n8n_url) {
           setCredentials({
-            url: result.url,
-            user: result.username,
-            pass: result.password,
-            expiresAt: result.expiresAt,
+            url: session.n8n_url,
+            user: session.n8n_username || 'n8n',
+            pass: session.n8n_password || '',
+            expiresAt: session.expires_at,
           });
           setStatus('success');
-        } else {
+          clearInterval(pollInterval);
+        } else if (session.status === 'failed') {
           setStatus('error');
+          clearInterval(pollInterval);
         }
       } catch (err) {
-        console.error('Provisioning failed:', err);
-        setStatus('error');
+        console.error('Polling failed:', err);
       }
     };
 
-    setup();
+    // Initial poll
+    poll();
+    // Start interval
+    pollInterval = window.setInterval(poll, 3000);
+
+    return () => clearInterval(pollInterval);
   }, [paramsLoaded, sessionId, orderId]);
 
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
@@ -131,6 +114,12 @@ export default function SandboxSuccess() {
               />
             </div>
             <span className="font-mono text-sm text-text-tertiary">~{countdown}s remaining</span>
+            
+            {timedOut && (
+              <p className="mt-8 text-amber-500 font-medium animate-pulse">
+                Taking longer than expected, check your email
+              </p>
+            )}
           </div>
         )}
 

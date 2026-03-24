@@ -8,11 +8,18 @@ import Footer from '../components/layout/Footer';
 
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
+const VARIANT_IDS = {
+  spark:    import.meta.env.VITE_SANDBOX_VARIANT_SPARK,
+  explorer: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER,
+  builder:  import.meta.env.VITE_SANDBOX_VARIANT_BUILDER,
+  pro:      import.meta.env.VITE_SANDBOX_VARIANT_PRO,
+};
+
 const TIERS: Record<TierKey, { label: string; duration: string; price: string; priceNote: string; memory: string; popular: boolean; variantId: string }> = {
-  spark:    { label: 'Spark',    duration: '1 hour',  price: '$2',  priceNote: 'one-time', memory: '512MB RAM', popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_SPARK || '918054' },
-  explorer: { label: 'Explorer', duration: '4 hours', price: '$6',  priceNote: 'one-time', memory: '1GB RAM',   popular: true,  variantId: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER || '918063' },
-  builder:  { label: 'Builder',  duration: '1 day',   price: '$9',  priceNote: 'one-time', memory: '1GB RAM',   popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_BUILDER || '918066' },
-  pro:      { label: 'Pro',      duration: '1 week',  price: '$29', priceNote: 'one-time', memory: '2GB RAM',   popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_PRO || '918067' },
+  spark:    { label: 'Spark',    duration: '1 hour',  price: '$2',  priceNote: 'one-time', memory: '512MB RAM', popular: false, variantId: VARIANT_IDS.spark || '918054' },
+  explorer: { label: 'Explorer', duration: '4 hours', price: '$6',  priceNote: 'one-time', memory: '1GB RAM',   popular: true,  variantId: VARIANT_IDS.explorer || '918063' },
+  builder:  { label: 'Builder',  duration: '1 day',   price: '$9',  priceNote: 'one-time', memory: '1GB RAM',   popular: false, variantId: VARIANT_IDS.builder || '918066' },
+  pro:      { label: 'Pro',      duration: '1 week',  price: '$29', priceNote: 'one-time', memory: '2GB RAM',   popular: false, variantId: VARIANT_IDS.pro || '918067' },
 };
 
 const FAQS = [
@@ -47,11 +54,14 @@ export default function Sandbox() {
     const tierData = TIERS[selectedTier];
     
     // 1. Create sandbox session row in Supabase
-    // Calculate naive expiresAt just to put something in DB (will be overridden accurately after setup)
-    const durationHours = selectedTier === 'spark' ? 1 : selectedTier === 'explorer' ? 4 : selectedTier === 'builder' ? 24 : 168;
-    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+    const durationHours = selectedTier === 'spark' ? 1 
+      : selectedTier === 'explorer' ? 4 
+      : selectedTier === 'builder' ? 24 
+      : 168;
+    const tierDurationMs = durationHours * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + tierDurationMs).toISOString();
     
-    const { data, error } = await supabase
+    const { data: sessionData, error } = await supabase
       .from('sandbox_sessions')
       // @ts-expect-error type inference failure
       .insert({
@@ -64,21 +74,22 @@ export default function Sandbox() {
       .select('id')
       .single();
 
-    const session = data as any;
-
-    if (error || !session) {
+    if (error || !sessionData) {
       alert('Failed to initialize session. Please try again.');
       return;
     }
 
+    const sessionId = (sessionData as any).id;
+
     // 2. Build LemonSqueezy URL
     const storeSlug = import.meta.env.VITE_LEMONSQUEEZY_STORE_SLUG || 'n8ngalaxy';
     const url = new URL(`https://${storeSlug}.lemonsqueezy.com/checkout/buy/${tierData.variantId}`);
+    
     if (user.email) url.searchParams.set('checkout[email]', user.email);
-    if (profile?.full_name) url.searchParams.set('checkout[name]', profile.full_name);
+    url.searchParams.set('checkout[name]', profile?.full_name || '');
     
     url.searchParams.set('checkout[custom][user_id]', user.id);
-    url.searchParams.set('checkout[custom][session_id]', session.id);
+    url.searchParams.set('checkout[custom][session_id]', sessionId);
     url.searchParams.set('checkout[custom][tier]', selectedTier);
 
     window.location.href = url.toString();
