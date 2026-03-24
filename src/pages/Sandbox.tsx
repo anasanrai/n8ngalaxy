@@ -9,10 +9,10 @@ import Footer from '../components/layout/Footer';
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
 const TIERS: Record<TierKey, { label: string; duration: string; price: string; priceNote: string; memory: string; popular: boolean; variantId: string }> = {
-  spark:    { label: 'Spark',    duration: '1 hour',  price: '$2',  priceNote: 'one-time', memory: '512MB RAM', popular: false, variantId: 'SPARK_VARIANT_ID' },
-  explorer: { label: 'Explorer', duration: '4 hours', price: '$6',  priceNote: 'one-time', memory: '1GB RAM',   popular: true,  variantId: 'EXPLORER_VARIANT_ID' },
-  builder:  { label: 'Builder',  duration: '1 day',   price: '$9',  priceNote: 'one-time', memory: '1GB RAM',   popular: false, variantId: 'BUILDER_VARIANT_ID' },
-  pro:      { label: 'Pro',      duration: '1 week',  price: '$29', priceNote: 'one-time', memory: '2GB RAM',   popular: false, variantId: 'PRO_VARIANT_ID' },
+  spark:    { label: 'Spark',    duration: '1 hour',  price: '$2',  priceNote: 'one-time', memory: '512MB RAM', popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_SPARK || '918054' },
+  explorer: { label: 'Explorer', duration: '4 hours', price: '$6',  priceNote: 'one-time', memory: '1GB RAM',   popular: true,  variantId: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER || '918063' },
+  builder:  { label: 'Builder',  duration: '1 day',   price: '$9',  priceNote: 'one-time', memory: '1GB RAM',   popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_BUILDER || '918066' },
+  pro:      { label: 'Pro',      duration: '1 week',  price: '$29', priceNote: 'one-time', memory: '2GB RAM',   popular: false, variantId: import.meta.env.VITE_SANDBOX_VARIANT_PRO || '918067' },
 };
 
 const FAQS = [
@@ -72,7 +72,8 @@ export default function Sandbox() {
     }
 
     // 2. Build LemonSqueezy URL
-    const url = new URL(`https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${tierData.variantId}`);
+    const storeSlug = import.meta.env.VITE_LEMONSQUEEZY_STORE_SLUG || 'n8ngalaxy';
+    const url = new URL(`https://${storeSlug}.lemonsqueezy.com/checkout/buy/${tierData.variantId}`);
     if (user.email) url.searchParams.set('checkout[email]', user.email);
     if (profile?.full_name) url.searchParams.set('checkout[name]', profile.full_name);
     
