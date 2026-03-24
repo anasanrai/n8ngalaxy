@@ -7,6 +7,7 @@ import { Spinner } from './components/ui/Spinner';
 import Home from './pages/Home';
 import Marketplace from './pages/Marketplace';
 import Sandbox from './pages/Sandbox';
+import SandboxSuccess from './pages/SandboxSuccess';
 import Hosting from './pages/Hosting';
 import Learn from './pages/Learn';
 import Dashboard from './pages/Dashboard';
@@ -45,6 +46,8 @@ function App() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/template/:slug" element={<TemplatePage />} />
           <Route path="/sandbox" element={<Sandbox />} />
+          <Route path="/sandbox/success" element={<SandboxSuccess />} />
+          <Route path="/sandbox/cancel" element={<Navigate to="/sandbox" replace />} />
           <Route path="/hosting" element={<Hosting />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/auth" element={<Auth />} />
