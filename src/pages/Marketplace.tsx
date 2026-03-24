@@ -68,10 +68,10 @@ export default function Marketplace() {
   }, [templates, activeCategory, sortBy]);
 
   return (
-    <div className="min-h-screen bg-background text-text-primary flex flex-col">
+    <div className="min-h-screen flex flex-col text-text-primary">
       <Navbar />
 
-      <main className="flex-grow">
+      <main className="flex-1">
         {/* Header Section */}
         <section className="bg-background pt-[144px] pb-12 px-6 text-center">
           <div className="max-w-[1200px] mx-auto">

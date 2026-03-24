@@ -91,9 +91,9 @@ export default function TemplatePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-grow pt-[144px] px-6 max-w-[1200px] mx-auto w-full flex justify-center">
+        <main className="flex-1 pt-[144px] px-6 max-w-[1200px] mx-auto w-full flex justify-center bg-background">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
         </main>
         <Footer />
@@ -113,10 +113,10 @@ export default function TemplatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-grow pt-[144px] pb-[96px] px-6">
+      <main className="flex-1 pt-[144px] pb-[96px] px-6 bg-background">
         <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-12 lg:gap-24 relative items-start">
           
           {/* Left Column - Details */}
