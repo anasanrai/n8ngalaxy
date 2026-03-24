@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Shield, Clock, Check, X, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Zap, Shield, Clock, Check, X, ExternalLink, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/layout/Navbar';
@@ -8,12 +8,19 @@ import Footer from '../components/layout/Footer';
 
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
-const VARIANT_IDS = {
-  spark:    import.meta.env.VITE_SANDBOX_VARIANT_SPARK,
-  explorer: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER,
-  builder:  import.meta.env.VITE_SANDBOX_VARIANT_BUILDER,
-  pro:      import.meta.env.VITE_SANDBOX_VARIANT_PRO,
-};
+const VARIANT_IDS: Record<string, string> = {
+  spark:    import.meta.env.VITE_SANDBOX_VARIANT_SPARK    || '',
+  explorer: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER || '',
+  builder:  import.meta.env.VITE_SANDBOX_VARIANT_BUILDER  || '',
+  pro:      import.meta.env.VITE_SANDBOX_VARIANT_PRO      || '',
+}
+
+const TIER_DURATION_MS: Record<string, number> = {
+  spark:    1   * 60 * 60 * 1000,
+  explorer: 4   * 60 * 60 * 1000,
+  builder:  24  * 60 * 60 * 1000,
+  pro:      168 * 60 * 60 * 1000,
+}
 
 const TIERS: Record<TierKey, { label: string; duration: string; price: string; priceNote: string; memory: string; popular: boolean; variantId: string }> = {
   spark:    { label: 'Spark',    duration: '1 hour',  price: '$2',  priceNote: 'one-time', memory: '512MB RAM', popular: false, variantId: VARIANT_IDS.spark || '918054' },
@@ -36,6 +43,7 @@ export default function Sandbox() {
 
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<TierKey | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -48,52 +56,43 @@ export default function Sandbox() {
     setPaymentModalOpen(true);
   };
 
-  const handleCheckout = async () => {
-    if (!user || !selectedTier) return;
-    
-    const tierData = TIERS[selectedTier];
-    
-    // 1. Create sandbox session row in Supabase
-    const durationHours = selectedTier === 'spark' ? 1 
-      : selectedTier === 'explorer' ? 4 
-      : selectedTier === 'builder' ? 24 
-      : 168;
-    const tierDurationMs = durationHours * 60 * 60 * 1000;
-    const expiresAt = new Date(Date.now() + tierDurationMs).toISOString();
-    
-    const { data: sessionData, error } = await supabase
-      .from('sandbox_sessions')
-      // @ts-expect-error type inference failure
-      .insert({
-        user_id: user.id,
-        tier: selectedTier,
-        subdomain: 'pending',
-        expires_at: expiresAt,
-        status: 'provisioning',
+  async function handleCheckout() {
+    if (!user || !selectedTier) return
+    setCheckoutLoading(true)
+    try {
+      const expiresAt = new Date(Date.now() + TIER_DURATION_MS[selectedTier]).toISOString()
+      
+      const { data: session, error } = await supabase
+        .from('sandbox_sessions')
+        // @ts-expect-error type inference failure
+        .insert({
+          user_id: user.id,
+          tier: selectedTier,
+          subdomain: 'pending',
+          expires_at: expiresAt,
+          status: 'provisioning',
+        })
+        .select('id')
+        .single()
+
+      if (error || !session) throw new Error('Failed to create session')
+
+      const variantId = VARIANT_IDS[selectedTier]
+      const params = new URLSearchParams({
+        'checkout[email]': user.email || '',
+        'checkout[name]': profile?.full_name || '',
+        'checkout[custom][user_id]': user.id,
+        'checkout[custom][session_id]': (session as any).id,
+        'checkout[custom][tier]': selectedTier,
       })
-      .select('id')
-      .single();
 
-    if (error || !sessionData) {
-      alert('Failed to initialize session. Please try again.');
-      return;
+      window.location.href = 
+        `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`
+    } catch (err) {
+      console.error('Checkout error:', err)
+      setCheckoutLoading(false)
     }
-
-    const sessionId = (sessionData as any).id;
-
-    // 2. Build LemonSqueezy URL
-    const storeSlug = import.meta.env.VITE_LEMONSQUEEZY_STORE_SLUG || 'n8ngalaxy';
-    const url = new URL(`https://${storeSlug}.lemonsqueezy.com/checkout/buy/${tierData.variantId}`);
-    
-    if (user.email) url.searchParams.set('checkout[email]', user.email);
-    url.searchParams.set('checkout[name]', profile?.full_name || '');
-    
-    url.searchParams.set('checkout[custom][user_id]', user.id);
-    url.searchParams.set('checkout[custom][session_id]', sessionId);
-    url.searchParams.set('checkout[custom][tier]', selectedTier);
-
-    window.location.href = url.toString();
-  };
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-text-primary">
@@ -304,9 +303,14 @@ export default function Sandbox() {
 
             <button
               onClick={handleCheckout}
-              className="w-full h-[52px] bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-[8px] font-sans font-semibold text-[16px] transition-colors flex items-center justify-center gap-2 cursor-pointer mb-4"
+              disabled={checkoutLoading}
+              className="w-full h-[52px] bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-[#7C3AED]/50 disabled:cursor-not-allowed text-white rounded-[8px] font-sans font-semibold text-[16px] transition-colors flex items-center justify-center gap-2 cursor-pointer mb-4"
             >
-              Pay with LemonSqueezy <ExternalLink size={16} />
+              {checkoutLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>Pay with LemonSqueezy <ExternalLink size={16} /></>
+              )}
             </button>
 
             <button 
