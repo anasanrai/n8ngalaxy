@@ -11,6 +11,7 @@ import Hosting from './pages/Hosting';
 import Learn from './pages/Learn';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
+import TemplatePage from './pages/TemplatePage';
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/template/:slug" element={<TemplatePage />} />
           <Route path="/sandbox" element={<Sandbox />} />
           <Route path="/hosting" element={<Hosting />} />
           <Route path="/learn" element={<Learn />} />
