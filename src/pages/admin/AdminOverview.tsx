@@ -278,7 +278,7 @@ export default function AdminOverview() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: '#1E1E30', border: 'none', borderRadius: 8, color: '#F4F4F8', fontSize: 12 }}
-                  formatter={(value: number) => [`$${value}`, '']}
+                  formatter={(value: unknown) => [`$${Number(value)}`, '']}
                 />
               </PieChart>
             </ResponsiveContainer>
