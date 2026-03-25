@@ -7,6 +7,7 @@ export default function Footer() {
       { name: 'Sandbox', path: '/sandbox' },
       { name: 'Hosting', path: '/hosting' },
       { name: 'Learn', path: '/learn' },
+      { name: 'CashPilot', path: '/cashpilot' },
     ],
     Company: [
       { name: 'About', path: '/about' },

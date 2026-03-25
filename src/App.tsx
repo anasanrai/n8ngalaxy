@@ -14,6 +14,7 @@ import Learn from './pages/Learn';
 import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
 import TemplatePage from './pages/TemplatePage';
+import CashPilot from './pages/CashPilot';
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ function App() {
           <Route path="/sandbox/cancel" element={<Navigate to="/sandbox" replace />} />
           <Route path="/hosting" element={<Hosting />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/cashpilot" element={<CashPilot />} />
           <Route path="/auth" element={<Auth />} />
           <Route 
             path="/dashboard" 
