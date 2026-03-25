@@ -57,11 +57,31 @@ export default function Sandbox() {
   };
 
   async function handleCheckout() {
-    if (!user || !selectedTier) return
+    if (!user || !selectedTier) {
+      console.error('No user or tier selected', { user: !!user, selectedTier })
+      return
+    }
+    
+    const variantId = VARIANT_IDS[selectedTier]
+    if (!variantId) {
+      console.error('No variant ID for tier:', selectedTier, VARIANT_IDS)
+      alert(`Configuration error: no variant ID for ${selectedTier}. Check env vars.`)
+      return
+    }
+
     setCheckoutLoading(true)
+    
     try {
-      const expiresAt = new Date(Date.now() + TIER_DURATION_MS[selectedTier]).toISOString()
+      const expiresAt = new Date(
+        Date.now() + TIER_DURATION_MS[selectedTier]
+      ).toISOString()
       
+      console.log('Creating sandbox session...', { 
+        user_id: user.id, 
+        tier: selectedTier, 
+        expires_at: expiresAt 
+      })
+
       const { data: session, error } = await supabase
         .from('sandbox_sessions')
         // @ts-expect-error type inference failure
@@ -75,21 +95,37 @@ export default function Sandbox() {
         .select('id')
         .single()
 
-      if (error || !session) throw new Error('Failed to create session')
+      if (error) {
+        console.error('Supabase insert error:', error)
+        alert(`Error creating session: ${error.message}`)
+        setCheckoutLoading(false)
+        return
+      }
 
-      const variantId = VARIANT_IDS[selectedTier]
-      const params = new URLSearchParams({
-        'checkout[email]': user.email || '',
-        'checkout[name]': profile?.full_name || '',
-        'checkout[custom][user_id]': user.id,
-        'checkout[custom][session_id]': (session as any).id,
-        'checkout[custom][tier]': selectedTier,
-      })
+      if (!session) {
+        console.error('No session returned from insert')
+        alert('Failed to create session. Try again.')
+        setCheckoutLoading(false)
+        return
+      }
 
-      window.location.href = 
-        `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`
+      console.log('Session created:', (session as any).id)
+
+      const params = new URLSearchParams()
+      params.set('checkout[email]', user.email || '')
+      params.set('checkout[name]', profile?.full_name || '')
+      params.set('checkout[custom][user_id]', user.id)
+      params.set('checkout[custom][session_id]', (session as any).id)
+      params.set('checkout[custom][tier]', selectedTier)
+
+      const checkoutUrl = `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`
+      
+      console.log('Redirecting to:', checkoutUrl)
+      window.location.href = checkoutUrl
+
     } catch (err) {
       console.error('Checkout error:', err)
+      alert(`Unexpected error: ${err}`)
       setCheckoutLoading(false)
     }
   }
