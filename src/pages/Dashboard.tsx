@@ -107,7 +107,7 @@ export default function Dashboard() {
       <main className="flex-grow pt-[112px] pb-[96px] px-6 max-w-[1000px] w-full mx-auto">
         <h1 className="font-display font-extrabold text-[32px] text-text-primary mb-2">Dashboard</h1>
         <p className="font-sans font-normal text-[16px] text-text-secondary mb-12">
-          Welcome back, {profile?.full_name || profile?.email || 'Builder'}
+          Welcome back, {profile?.full_name || user?.email?.split('@')[0] || 'there'}
         </p>
 
         {/* Tabs */}

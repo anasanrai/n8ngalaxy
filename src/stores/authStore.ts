@@ -35,7 +35,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 
         if (error) throw error;
 
-        set({ user, profile: data as Profile, loading: false });
+        const profile = data as Profile;
+
+        // Fix missing full_name from Auth metadata (Google OAuth)
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser && (!profile.full_name || profile.full_name === '')) {
+          const name = authUser.user_metadata?.full_name || 
+                       authUser.user_metadata?.name || 
+                       authUser.email?.split('@')[0] || 
+                       'User';
+          
+          await (supabase.from('profiles') as any)
+            .update({ full_name: name })
+            .eq('id', authUser.id);
+          
+          profile.full_name = name;
+        }
+
+        set({ user, profile, loading: false });
       } catch (error) {
         console.error('Error fetching profile:', error);
         set({ user, profile: null, loading: false });
