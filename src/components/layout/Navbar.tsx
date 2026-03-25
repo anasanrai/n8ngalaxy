@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Shield } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function Navbar() {
@@ -88,6 +88,16 @@ export default function Navbar() {
                 >
                   Dashboard
                 </button>
+                {(profile as (typeof profile & { role?: string }) | null)?.role === 'admin' && (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full text-left px-4 py-2 text-[14px] font-sans hover:bg-background transition-colors cursor-pointer flex items-center gap-2"
+                    style={{ color: '#7C3AED' }}
+                  >
+                    <Shield size={13} />
+                    Admin Panel
+                  </button>
+                )}
                 <div className="my-1 border-t border-border"></div>
                 <button
                   onClick={() => signOut()}
