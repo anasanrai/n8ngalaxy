@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SearchX } from 'lucide-react';
-import Navbar from '../components/layout/Navbar';
-import Footer from '../components/layout/Footer';
-import TemplateCard from '../components/TemplateCard';
+import { GitBranch } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Template } from '../types';
+import { useAuthStore } from '../stores/authStore';
 
 const CATEGORIES = [
   'All',
@@ -21,6 +20,8 @@ const CATEGORIES = [
 export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Featured');
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ['templates'],
@@ -39,14 +40,12 @@ export default function Marketplace() {
   const filteredAndSortedTemplates = useMemo(() => {
     if (!templates) return [];
 
-    // Filter
     let result = templates;
     if (activeCategory !== 'All') {
       const dbCategory = activeCategory.toLowerCase().replace(' ', '_');
       result = result.filter(t => t.category === dbCategory);
     }
 
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case 'Price: Low':
@@ -68,92 +67,182 @@ export default function Marketplace() {
   }, [templates, activeCategory, sortBy]);
 
   return (
-    <div className="min-h-screen flex flex-col text-text-primary">
-      <Navbar />
+    <div className="min-h-screen flex flex-col bg-[#0D0D14]">
+      {/* Top Bar inline */}
+      <div
+        style={{
+          height: 48,
+          background: '#0D0D14',
+          borderBottom: '0.5px solid #1E1E30',
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: '#9CA3AF', fontSize: 13 }}>n8n</span>
+          <span style={{ fontFamily: '"Syne", sans-serif', fontWeight: 800, color: '#F4F4F8', fontSize: 13, marginLeft: 2 }}>Galaxy</span>
+        </div>
 
-      <main className="flex-1">
-        {/* Header Section */}
-        <section className="bg-background pt-[144px] pb-12 px-6 text-center">
-          <div className="max-w-[1200px] mx-auto">
-            <span className="block font-sans font-medium text-[12px] text-primary tracking-[0.1em] uppercase mb-4">MARKETPLACE</span>
-            <h1 className="font-display font-extrabold text-[48px] text-text-primary leading-tight mb-4">
-              Browse n8n Templates
-            </h1>
-            <p className="font-sans font-normal text-[16px] text-text-secondary">
-              Production-ready workflows. Download JSON, import, done.
-            </p>
-          </div>
-        </section>
-
-        {/* Filter Bar */}
-        <section className="sticky top-[64px] z-40 bg-background border-b border-border py-4 px-6 md:px-12">
-          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Categories */}
-            <div className="flex overflow-x-auto w-full md:w-auto gap-2 pb-2 md:pb-0 scrollbar-hide">
-              {CATEGORIES.map(category => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`flex-none h-[32px] px-[14px] rounded-pill font-sans font-medium text-[13px] border transition-colors whitespace-nowrap ${
-                    activeCategory === category
-                      ? 'bg-primary/15 border-primary/40 text-primary'
-                      : 'bg-surface border-border text-text-secondary hover:text-text-primary hover:border-text-secondary/30'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="w-full md:w-auto flex justify-end shrink-0">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="h-[32px] pl-[12px] pr-[30px] rounded-input bg-surface border border-border text-text-secondary font-sans font-medium text-[13px] focus:outline-none focus:border-primary appearance-none cursor-pointer"
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }} className="scrollbar-hide px-4">
+          {CATEGORIES.map(cat => {
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
                 style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
+                  height: 28,
+                  padding: '0 12px',
+                  borderRadius: 9999,
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 500,
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  background: isActive ? 'rgba(124,58,237,0.15)' : 'transparent',
+                  border: isActive ? '0.5px solid rgba(124,58,237,0.3)' : '0.5px solid #1E1E30',
+                  color: isActive ? '#7C3AED' : '#6B7280',
+                  cursor: 'pointer',
+                  transition: 'color 150ms',
                 }}
+                onMouseEnter={(e) => { if(!isActive) e.currentTarget.style.color = '#9CA3AF'; }}
+                onMouseLeave={(e) => { if(!isActive) e.currentTarget.style.color = '#6B7280'; }}
               >
-                {['Featured', 'Price: Low', 'Price: High', 'Newest'].map(option => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#6B7280',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 13,
+              cursor: 'pointer',
+              outline: 'none',
+              appearance: 'none',
+            }}
+          >
+            {['Featured', 'Price: Low', 'Price: High', 'Newest'].map(option => (
+              <option key={option} value={option} style={{ background: '#13131F', color: '#F4F4F8' }}>{option}</option>
+            ))}
+          </select>
+
+          {user ? (
+            <div 
+              style={{ width: 28, height: 28, borderRadius: '50%', background: '#1E1E30', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#F4F4F8' }}
+              onClick={() => navigate('/dashboard')}
+            >
+              U
             </div>
-          </div>
-        </section>
+          ) : (
+            <span 
+              onClick={() => navigate('/auth', { state: { returnTo: '/marketplace' } })}
+              style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#9CA3AF', cursor: 'pointer' }}
+            >
+              Sign in
+            </span>
+          )}
+        </div>
+      </div>
 
-        {/* Template Grid */}
-        <section className="py-12 px-6">
-          <div className="max-w-[1200px] mx-auto">
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-[340px] rounded-card border border-border bg-surface overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-surface via-border to-surface w-[200%] animate-[shimmer_2s_infinite]" style={{ backgroundSize: '200% 100%' }}></div>
+      <main className="flex-1 w-full" style={{ maxWidth: '100%' }}>
+        {isLoading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '0.5px', background: '#1E1E30' }}>
+            {[...Array(12)].map((_, i) => (
+              <div key={i} style={{ height: 280, background: '#13131F' }} className="animate-pulse" />
+            ))}
+          </div>
+        ) : filteredAndSortedTemplates.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '0.5px', background: '#1E1E30' }}>
+            
+            {filteredAndSortedTemplates.map(t => {
+              const price = t.price_cents > 0 ? `$${(t.price_cents / 100).toFixed(2)}` : 'Free';
+              const priceColor = t.price_cents > 0 ? '#F4F4F8' : '#00E5C7';
+              
+              const nodesApproxCount = t.tools_used && t.tools_used.length > 0 ? t.tools_used.length + 3 : 5;
+
+              return (
+                <div 
+                  key={t.id}
+                  onClick={() => navigate(`/template/${t.slug}`)}
+                  style={{
+                    background: '#0D0D14',
+                    padding: 24,
+                    cursor: 'pointer',
+                    transition: 'background 150ms',
+                    borderRight: '0.5px solid #1E1E30',
+                    borderBottom: '0.5px solid #1E1E30',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                  }}
+                  className="group"
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#13131F'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#0D0D14'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'start' }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>
+                      {t.category.replace('_', ' ')}
+                    </span>
+                    {t.featured && (
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 11, color: '#F59E0B' }}>★ Featured</span>
+                    )}
                   </div>
-                ))}
-              </div>
-            ) : filteredAndSortedTemplates.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAndSortedTemplates.map(template => (
-                  <TemplateCard key={template.id} template={template} />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <SearchX className="w-12 h-12 text-text-tertiary mb-6" />
-                <h3 className="font-display font-bold text-[20px] text-text-secondary mb-2">No templates found</h3>
-                <p className="font-sans font-normal text-[14px] text-text-tertiary">Try a different category</p>
-              </div>
-            )}
-          </div>
-        </section>
-      </main>
+                  
+                  <h3 style={{ fontFamily: '"Syne", sans-serif', fontWeight: 700, fontSize: 17, color: '#F4F4F8', lineHeight: 1.3, marginBottom: 6 }} className="line-clamp-2">
+                    {t.title}
+                  </h3>
+                  
+                  <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280', lineHeight: 1.5, flex: 1 }} className="line-clamp-3">
+                    {t.description}
+                  </p>
+                  
+                  {t.tools_used && t.tools_used.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 12 }}>
+                      {t.tools_used.slice(0, 4).map(tool => (
+                        <span key={tool} style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 4, padding: '2px 6px', fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-      <Footer />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6B7280' }}>
+                      <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 12 }}>{nodesApproxCount} nodes</span>
+                      <GitBranch size={10} />
+                    </div>
+                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, fontSize: 16, color: priceColor }}>
+                      {price}
+                    </span>
+                  </div>
+
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#13131F] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-end justify-center pb-4" style={{ pointerEvents: 'none' }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#7C3AED' }}>Get template →</span>
+                  </div>
+                </div>
+              );
+            })}
+
+          </div>
+        ) : (
+          <div style={{ padding: 48, textAlign: 'center' }}>
+            <span style={{ fontFamily: 'Inter, sans-serif', color: '#6B7280', fontSize: 14 }}>No templates found.</span>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -1,57 +1,104 @@
-import { useEffect, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import type { SandboxSession } from '../types'
-import Navbar from '../components/layout/Navbar'
-import Footer from '../components/layout/Footer'
-import { 
-  Loader2, 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Copy, 
-  ExternalLink, 
-  Eye, 
-  EyeOff,
-  Check
-} from 'lucide-react'
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Copy, Check, EyeOff, Eye } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import type { SandboxSession } from '../types';
+import TopBar from '../components/layout/TopBar';
 
-type Status = 'polling' | 'ready' | 'failed' | 'timeout'
+import {
+  ReactFlow,
+  Background,
+  BackgroundVariant,
+  MarkerType,
+  Handle,
+  Position,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+// --- Mini Flow ---
+const WebhookNode = () => (
+  <div style={{ background: '#13131F', border: '0.5px solid #7C3AED', borderRadius: 8, padding: 8 }}>
+    <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 11, color: '#F4F4F8' }}>Webhook Trigger</div>
+    <Handle type="source" position={Position.Right} style={{ background: '#00E5C7', width: 6, height: 6, border: 'none' }} />
+  </div>
+);
+const HttpNode = () => (
+  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: 8 }}>
+    <Handle type="target" position={Position.Left} style={{ background: '#00E5C7', width: 6, height: 6, border: 'none' }} />
+    <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 11, color: '#F4F4F8' }}>HTTP Request</div>
+    <Handle type="source" position={Position.Right} style={{ background: '#00E5C7', width: 6, height: 6, border: 'none' }} />
+  </div>
+);
+const nodeTypes = { webhook: WebhookNode, http: HttpNode };
+const initialNodes = [
+  { id: '1', position: { x: 50, y: 150 }, type: 'webhook', data: {} },
+  { id: '2', position: { x: 250, y: 150 }, type: 'http', data: {} },
+];
+const initialEdges = [
+  { 
+    id: 'e1-2', source: '1', target: '2', 
+    animated: true, 
+    style: { stroke: '#7C3AED', strokeWidth: 1.5, strokeDasharray: '4 4' },
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#7C3AED' }
+  },
+];
+
+type Status = 'polling' | 'ready' | 'failed' | 'timeout';
+
+const TERMINAL_LINES = [
+  { text: "$ docker pull n8nio/n8n:latest", color: "#6B7280" },
+  { text: "$ docker run --name sandbox-xyz ...", color: "#6B7280" },
+  { text: "$ traefik route configured", color: "#6B7280" },
+  { text: "✓ Container started", color: "#10B981" },
+  { text: "✓ n8n initializing...", color: "#10B981" },
+  { text: "Waiting for health check...", color: "#F59E0B" }
+];
 
 export default function SandboxSuccess() {
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const sessionId = searchParams.get('session_id')
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const sessionId = searchParams.get('session_id');
 
-  const [status, setStatus] = useState<Status>('polling')
-  const [session, setSession] = useState<SandboxSession | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [copiedField, setCopiedField] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
+  const [status, setStatus] = useState<Status>('polling');
+  const [session, setSession] = useState<SandboxSession | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const [visibleLines, setVisibleLines] = useState(0);
+  const [expiresInStr, setExpiresInStr] = useState('');
+
+  // Terminal animation
+  useEffect(() => {
+    if (status !== 'polling') return;
+    const interval = setInterval(() => {
+      setVisibleLines(v => (v < TERMINAL_LINES.length ? v + 1 : v));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  // Progress animation
+  useEffect(() => {
+    if (status !== 'polling') return;
+    const interval = setInterval(() => {
+      setProgress(p => (p < 90 ? p + 1 : p));
+    }, 1000); // 1% per sec -> 90% in 90s
+    return () => clearInterval(interval);
+  }, [status]);
 
   // Redirect if no session ID
   useEffect(() => {
     if (!sessionId) {
-      navigate('/sandbox')
+      navigate('/sandbox');
     }
-  }, [sessionId, navigate])
-
-  // Progress bar animation
-  useEffect(() => {
-    if (status === 'polling') {
-      const timer = setTimeout(() => {
-        setProgress(95)
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [status])
+  }, [sessionId, navigate]);
 
   // Polling logic
   useEffect(() => {
-    if (!sessionId || status !== 'polling') return
+    if (!sessionId || status !== 'polling') return;
 
-    let pollCount = 0
-    const maxPolls = 60 // 3 minutes at 3s intervals
+    let pollCount = 0;
+    const maxPolls = 60; // 3 minutes at 3s intervals
 
     const poll = async () => {
       try {
@@ -59,217 +106,219 @@ export default function SandboxSuccess() {
           .from('sandbox_sessions')
           .select('*')
           .eq('id', sessionId)
-          .single()
+          .single();
 
-        if (error) {
-          console.error('Error fetching session:', error)
-          return
-        }
+        if (error) return;
 
-        const sessionData = data as unknown as SandboxSession
+        const sessionData = data as unknown as SandboxSession;
 
         if (sessionData.status === 'active') {
-          setSession(sessionData)
-          setStatus('ready')
-          clearInterval(interval)
+          setSession(sessionData);
+          setStatus('ready');
         } else if (sessionData.status === 'failed') {
-          setStatus('failed')
-          clearInterval(interval)
+          setStatus('failed');
         }
-      } catch (err) {
-        console.error('Polling error:', err)
-      }
+      } catch (err) {}
 
-      pollCount++
+      pollCount++;
       if (pollCount >= maxPolls) {
-        setStatus('timeout')
-        clearInterval(interval)
+        setStatus('timeout');
       }
-    }
+    };
 
-    const interval = setInterval(poll, 3000)
-    poll() // Initial poll
+    const intervalId = setInterval(poll, 3000);
+    poll(); // Initial poll
 
-    return () => clearInterval(interval)
-  }, [sessionId, status])
+    return () => clearInterval(intervalId);
+  }, [sessionId, status]);
+
+  // Expiry countdown
+  useEffect(() => {
+    if (status !== 'ready' || !session) return;
+    
+    const updateCountdown = () => {
+      const ms = new Date(session.expires_at).getTime() - Date.now();
+      if (ms <= 0) {
+        setExpiresInStr('expired');
+        return;
+      }
+      const hrs = Math.floor(ms / 3600000);
+      const mins = Math.floor((ms % 3600000) / 60000);
+      const secs = Math.floor((ms % 60000) / 1000);
+      setExpiresInStr(`${hrs}h ${mins}m ${secs}s`);
+    };
+
+    updateCountdown();
+    const int = setInterval(updateCountdown, 1000);
+    return () => clearInterval(int);
+  }, [status, session]);
 
   const handleCopy = (value: string, field: string) => {
-    navigator.clipboard.writeText(value)
-    setCopiedField(field)
-    setTimeout(() => setCopiedField(null), 2000)
-  }
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0D0D14] text-[#F4F4F8]">
-      <Navbar />
+    <div className="min-h-screen flex flex-col bg-[#0D0D14]">
+      <TopBar />
       
-      <main className="flex-1 flex flex-col items-center justify-center p-6">
+      <main className="flex-1 flex" style={status === 'polling' || status === 'failed' || status === 'timeout' ? { alignItems: 'center', justifyContent: 'center' } : {}}>
         {status === 'polling' && (
-          <div className="flex flex-col items-center text-center">
-            <Loader2 className="w-16 h-16 text-[#7C3AED] animate-spin" />
-            <h1 className="font-display font-extrabold text-[28px] text-[#F4F4F8] mt-6 leading-tight">
-              Spinning up your instance
-            </h1>
-            <p className="font-sans font-normal text-[16px] text-[#9CA3AF] mt-3 max-w-[400px]">
-              This takes about 90 seconds. Don't close this tab.
-            </p>
-            
-            <div className="mt-8 bg-[#13131F] rounded-full h-2 w-80 overflow-hidden">
-              <div 
-                className="h-full bg-[#7C3AED] transition-all duration-[90000ms] ease-linear"
-                style={{ width: `${progress}%` }}
-              />
+          <div style={{ display: 'flex', flexDirection: 'col', alignItems: 'center', width: '100%', maxWidth: 480, margin: '0 auto', background: '#0A0A0F', padding: 40, borderRadius: 12 }}>
+            <div style={{ width: '100%', marginBottom: 32, minHeight: 180 }}>
+              {TERMINAL_LINES.slice(0, visibleLines).map((line, i) => (
+                <div key={i} style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: line.color, marginBottom: 8, display: 'flex' }}>
+                  {line.text}
+                  {i === visibleLines - 1 && i === TERMINAL_LINES.length - 1 && (
+                    <span className="animate-pulse" style={{ width: 8, background: line.color, display: 'inline-block', marginLeft: 4 }}>|</span>
+                  )}
+                </div>
+              ))}
+              {visibleLines < TERMINAL_LINES.length && (
+                <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: '#6B7280', display: 'flex' }}>
+                  <span className="animate-pulse" style={{ width: 8, background: '#6B7280', display: 'inline-block', marginLeft: 4 }}>|</span>
+                </div>
+              )}
             </div>
-            <p className="font-sans font-normal text-[13px] text-[#6B7280] mt-4 italic">
-              Waiting for payment confirmation...
+
+            <div style={{ background: '#13131F', height: 2, width: '100%', borderRadius: 9999, overflow: 'hidden' }}>
+              <div style={{ background: 'linear-gradient(90deg, #7C3AED, #00E5C7)', height: '100%', width: `${progress}%`, transition: 'width 1s linear' }} />
+            </div>
+
+            <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 24 }}>
+              Your instance is provisioning.<br/>This takes about 90 seconds.
             </p>
           </div>
         )}
 
         {status === 'ready' && session && (
-          <div className="w-full max-w-[520px] bg-[#13131F] border border-[#1E1E30] rounded-[12px] p-10 flex flex-col items-center mt-16 mb-24 animate-in fade-in zoom-in duration-500">
-            <CheckCircle2 className="w-12 h-12 text-[#00E5C7] mb-4" />
-            <h1 className="font-display font-extrabold text-[32px] text-[#F4F4F8] text-center leading-tight">
-              Your sandbox is ready!
-            </h1>
-            <p className="font-sans font-normal text-[14px] text-[#9CA3AF] mt-2 mb-8 text-center">
-              Credentials also sent to your email.
-            </p>
+          <div style={{ display: 'flex', width: '100%', minHeight: '100%' }}>
+            
+            {/* Left Hand Canvas */}
+            <div style={{ width: '50%', background: '#0A0A0F', borderRight: '0.5px solid #1E1E30', position: 'relative' }} className="hidden lg:block relative">
+              <ReactFlow
+                nodes={initialNodes}
+                edges={initialEdges}
+                nodeTypes={nodeTypes}
+                nodesDraggable={false}
+                panOnDrag={false}
+                zoomOnScroll={false}
+                fitView
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background gap={24} size={1} color="#1E1E30" variant={BackgroundVariant.Dots} />
+              </ReactFlow>
+            </div>
 
-            <div className="w-full space-y-3">
-              {/* URL */}
-              <div className="bg-[#0D0D14] border border-[#1E1E30] rounded-[8px] p-4 flex justify-between items-center group">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <span className="text-[11px] font-sans font-bold text-[#6B7280] uppercase tracking-wider">Instance URL</span>
-                  <span className="font-mono text-[13px] text-[#00E5C7] truncate pr-4">{session.n8n_url}</span>
+            {/* Right Hand Credentials Panel */}
+            <div style={{ width: '100%', maxWidth: '100%', background: '#0D0D14', padding: '48px 40px' }} className="lg:w-1/2 overflow-y-auto">
+              <div style={{ maxWidth: 460, margin: '0 auto' }}>
+                
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#00E5C7', display: 'block' }} />
+                  <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 12, color: '#00E5C7', textTransform: 'uppercase' }}>Live</span>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button 
-                    onClick={() => handleCopy(session.n8n_url || '', 'url')}
-                    className="h-8 px-2 flex items-center justify-center text-[#6B7280] hover:text-[#F4F4F8] transition-colors"
-                  >
-                    {copiedField === 'url' ? <Check size={14} className="text-[#00E5C7]" /> : <Copy size={14} />}
-                  </button>
+
+                <h1 style={{ fontFamily: '"Syne", sans-serif', fontWeight: 800, fontSize: 28, color: '#F4F4F8', marginBottom: 6 }}>
+                  Your sandbox is running
+                </h1>
+                
+                <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, color: '#F59E0B', marginBottom: 32 }}>
+                  Expires in <span style={{ fontFamily: '"JetBrains Mono", monospace' }}>{expiresInStr}</span>
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
+                  {/* URL */}
+                  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 12, color: '#6B7280' }}>URL</span>
+                      <a href={session.n8n_url || '#'} target="_blank" rel="noreferrer" style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: '#00E5C7', textDecoration: 'none' }}>
+                        {session.n8n_url?.replace('https://', '')}
+                      </a>
+                    </div>
+                    <button 
+                      onClick={() => handleCopy(session.n8n_url || '', 'url')}
+                      style={{ background: 'transparent', border: 'none', color: '#6B7280', cursor: 'pointer' }}
+                    >
+                      {copiedField === 'url' ? <Check size={16} color="#00E5C7" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+
+                  {/* Username */}
+                  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 12, color: '#6B7280' }}>Username</span>
+                      <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: '#F4F4F8' }}>{session.n8n_username}</span>
+                    </div>
+                    <button 
+                      onClick={() => handleCopy(session.n8n_username || '', 'user')}
+                      style={{ background: 'transparent', border: 'none', color: '#6B7280', cursor: 'pointer' }}
+                    >
+                      {copiedField === 'user' ? <Check size={16} color="#00E5C7" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+
+                  {/* Password */}
+                  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 12, color: '#6B7280' }}>Password</span>
+                      <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: '#F4F4F8' }}>
+                        {showPassword ? session.n8n_password : '••••••••••••'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <button 
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{ background: 'transparent', border: 'none', color: '#6B7280', cursor: 'pointer' }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button 
+                        onClick={() => handleCopy(session.n8n_password || '', 'pass')}
+                        style={{ background: 'transparent', border: 'none', color: '#6B7280', cursor: 'pointer' }}
+                      >
+                        {copiedField === 'pass' ? <Check size={16} color="#00E5C7" /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <button 
                     onClick={() => window.open(session.n8n_url || '', '_blank')}
-                    className="h-8 px-2 flex items-center justify-center text-[#6B7280] hover:text-[#F4F4F8] transition-colors"
+                    style={{ width: '100%', height: 48, background: '#00E5C7', color: '#0A0A0F', border: 'none', borderRadius: 8, fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}
                   >
-                    <ExternalLink size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Username */}
-              <div className="bg-[#0D0D14] border border-[#1E1E30] rounded-[8px] p-4 flex justify-between items-center">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <span className="text-[11px] font-sans font-bold text-[#6B7280] uppercase tracking-wider">Username</span>
-                  <span className="font-mono text-[13px] text-[#F4F4F8] truncate pr-4">{session.n8n_username}</span>
-                </div>
-                <button 
-                  onClick={() => handleCopy(session.n8n_username || '', 'user')}
-                  className="h-8 px-2 flex items-center justify-center text-[#6B7280] hover:text-[#F4F4F8] transition-colors shrink-0"
-                >
-                  {copiedField === 'user' ? <Check size={14} className="text-[#00E5C7]" /> : <Copy size={14} />}
-                </button>
-              </div>
-
-              {/* Password */}
-              <div className="bg-[#0D0D14] border border-[#1E1E30] rounded-[8px] p-4 flex justify-between items-center">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <span className="text-[11px] font-sans font-bold text-[#6B7280] uppercase tracking-wider">Password</span>
-                  <span className="font-mono text-[13px] text-[#F4F4F8] truncate pr-4">
-                    {showPassword ? session.n8n_password : '••••••••••••'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button 
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="h-8 px-2 flex items-center justify-center text-[#6B7280] hover:text-[#F4F4F8] transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    Open n8n
                   </button>
                   <button 
-                    onClick={() => handleCopy(session.n8n_password || '', 'pass')}
-                    className="h-8 px-2 flex items-center justify-center text-[#6B7280] hover:text-[#F4F4F8] transition-colors"
+                    onClick={() => navigate('/dashboard')}
+                    style={{ width: '100%', background: 'transparent', color: '#9CA3AF', border: 'none', fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 14, cursor: 'pointer', textAlign: 'center' }}
                   >
-                    {copiedField === 'pass' ? <Check size={14} className="text-[#00E5C7]" /> : <Copy size={14} />}
+                    Go to Dashboard
                   </button>
                 </div>
+                
               </div>
-            </div>
-
-            <div className="mt-8 flex items-center gap-2 text-[#F59E0B]">
-              <Clock size={14} />
-              <span className="font-sans font-normal text-[13px]">
-                Expires {new Date(session.expires_at).toLocaleString()}
-              </span>
-            </div>
-
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full">
-              <button 
-                onClick={() => window.open(session.n8n_url || '', '_blank')}
-                className="flex-1 h-11 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-[8px] font-sans font-semibold text-[15px] transition-colors flex items-center justify-center px-8"
-              >
-                Open n8n
-              </button>
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="flex-1 h-11 bg-transparent border border-[#1E1E30] hover:border-[#7C3AED] text-[#9CA3AF] hover:text-[#F4F4F8] rounded-[8px] font-sans font-medium text-[15px] transition-all px-6"
-              >
-                Go to Dashboard
-              </button>
             </div>
           </div>
         )}
 
         {status === 'failed' && (
-          <div className="flex flex-col items-center text-center animate-in fade-in duration-500">
-            <AlertCircle className="w-12 h-12 text-[#EF4444]" />
-            <h1 className="font-display font-extrabold text-[24px] text-[#F4F4F8] mt-4">
-              Setup failed
-            </h1>
-            <div className="mt-3 space-y-1">
-              <p className="font-sans font-normal text-[14px] text-[#9CA3AF]">
-                Something went wrong provisioning your instance.
-              </p>
-              <p className="font-sans font-normal text-[14px] text-[#9CA3AF]">
-                Your payment was captured. Please contact support@n8ngalaxy.com
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/sandbox')}
-              className="mt-8 h-10 px-6 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-[8px] font-sans font-semibold text-[14px] transition-colors"
-            >
-              Try Again
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <span style={{ fontFamily: '"Syne", sans-serif', fontSize: 24, fontWeight: 700, color: '#F4F4F8', marginBottom: 12 }}>Setup failed.</span>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#9CA3AF' }}>Your payment was captured. Email hello@n8ngalaxy.com.</span>
           </div>
         )}
 
         {status === 'timeout' && (
-          <div className="flex flex-col items-center text-center animate-in fade-in duration-500">
-            <Clock className="w-12 h-12 text-[#F59E0B]" />
-            <h1 className="font-display font-extrabold text-[24px] text-[#F4F4F8] mt-4">
-              Taking longer than expected
-            </h1>
-            <div className="mt-3 space-y-1">
-              <p className="font-sans font-normal text-[14px] text-[#9CA3AF]">
-                Your instance is still being set up. Check your email for credentials.
-              </p>
-              <p className="font-sans font-normal text-[14px] text-[#9CA3AF]">
-                Check your email
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="mt-8 h-10 px-6 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-[8px] font-sans font-semibold text-[14px] transition-colors"
-            >
-              Go to Dashboard
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <span style={{ fontFamily: '"Syne", sans-serif', fontSize: 24, fontWeight: 700, color: '#F4F4F8', marginBottom: 12 }}>Taking longer than expected.</span>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#9CA3AF' }}>Check your email.</span>
           </div>
         )}
-      </main>
 
-      <Footer />
+      </main>
     </div>
-  )
+  );
 }
