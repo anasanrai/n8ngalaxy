@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard';
 import Auth from './pages/Auth';
 import TemplatePage from './pages/TemplatePage';
 import CashPilot from './pages/CashPilot';
+import SandboxSession from './pages/SandboxSession';
 import AdminRoute from './components/admin/AdminRoute';
 
 // Lazy-load admin pages (admin bundle stays separate)
@@ -84,6 +85,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sandbox/session/:sessionId"
+            element={
+              <ProtectedRoute>
+                <SandboxSession />
               </ProtectedRoute>
             }
           />

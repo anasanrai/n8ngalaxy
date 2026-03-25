@@ -263,14 +263,12 @@ export default function Dashboard() {
                               >
                                 <Trash2 size={13} />
                               </button>
-                              <a
-                                href={s.n8n_url || '#'}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex-1 max-w-[120px] h-[32px] font-sans font-medium text-[12px] text-white bg-primary hover:bg-primary-hover rounded-input transition-colors flex items-center justify-center cursor-pointer"
+                              <button
+                                onClick={() => navigate(`/sandbox/session/${s.id}`)}
+                                className="flex-1 max-w-[120px] h-[32px] font-sans font-medium text-[12px] text-white bg-primary hover:bg-primary-hover rounded-input transition-colors flex items-center justify-center cursor-pointer border-none"
                               >
-                                Open n8n
-                              </a>
+                                Open Editor
+                              </button>
                             </div>
                           </div>
                         </div>

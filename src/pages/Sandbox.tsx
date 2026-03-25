@@ -4,8 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { openPaddleCheckout } from '../lib/paddle';
-import TopBar from '../components/layout/TopBar';
-import DemoWorkflowCanvas from '../components/canvas/DemoWorkflowCanvas';
+import SandboxStandaloneHeader from '../components/sandbox/SandboxStandaloneHeader';
 
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
@@ -23,15 +22,12 @@ const TIER_DURATION_MS: Record<string, number> = {
   pro:      168 * 60 * 60 * 1000,
 };
 
-const TIERS: Record<TierKey, { label: string; duration: string; price: string }> = {
-  spark:    { label: 'Spark',    duration: '1 hour',  price: '$2' },
-  explorer: { label: 'Explorer', duration: '4 hours', price: '$6' },
-  builder:  { label: 'Builder',  duration: '1 day',   price: '$9' },
-  pro:      { label: 'Pro',      duration: '1 week',  price: '$29' },
-};
-
-
-
+// SVG Check icon helper
+const CheckIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8.33333 2.5L3.75 7.08333L1.66667 5" stroke="#00E5C7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 export default function Sandbox() {
   const { user, profile } = useAuth();
@@ -39,16 +35,19 @@ export default function Sandbox() {
 
   const [selectedTier, setSelectedTier] = useState<TierKey>('explorer');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [countdown, setCountdown] = useState(90);
 
-  // Auto count down from 90 to 0 on mount
   useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setInterval(() => {
-      setCountdown((c) => Math.max(0, c - 1));
-    }, 12); // fast countdown for aesthetic
-    return () => clearInterval(timer);
-  }, [countdown]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Allow ⌘↵ to trigger sandbox payment
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (user) handleCheckout();
+        else handleSignIn();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, profile, selectedTier]);
 
   async function handleCheckout() {
     if (!user || !selectedTier) return;
@@ -101,210 +100,176 @@ export default function Sandbox() {
     }
   }
 
-  // Keyboard shortcut listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleCheckout();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, selectedTier, checkoutLoading]);
+  const handleSignIn = () => {
+    navigate('/auth', { state: { returnTo: '/sandbox' } });
+  };
+
+  const getTierPriceLabel = (tier: TierKey) => {
+    switch (tier) {
+      case 'spark': return '$2';
+      case 'explorer': return '$6';
+      case 'builder': return '$9';
+      case 'pro': return '$29';
+    }
+  };
+  
+  const getTierLabel = (tier: TierKey) => {
+    switch (tier) {
+      case 'spark': return 'Spark';
+      case 'explorer': return 'Explorer';
+      case 'builder': return 'Builder';
+      case 'pro': return 'Pro';
+    }
+  };
+
+  const TIERS: { key: TierKey; name: string; price: string; spec: string }[] = [
+    { key: 'spark', name: 'Spark', price: '$2', spec: '1 hour · 512MB RAM' },
+    { key: 'explorer', name: 'Explorer', price: '$6', spec: '4 hours · 1GB RAM' },
+    { key: 'builder', name: 'Builder', price: '$9', spec: '1 day · 1GB RAM' },
+    { key: 'pro', name: 'Pro', price: '$29', spec: '1 week · 2GB RAM' },
+  ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0D0D14]">
-      <TopBar />
-
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', overflow: 'hidden' }}>
+      <SandboxStandaloneHeader />
+      
+      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100vh - 40px)', width: '100%' }}>
         {/* LEFT PANEL */}
-        <div style={{ width: '55%', position: 'relative', background: '#0A0A0F', borderRight: '0.5px solid #1E1E30' }} className="hidden lg:block relative">
-          <DemoWorkflowCanvas />
-
-          {/* Top-left LIVE DEMO badge */}
-          <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10, pointerEvents: 'none' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E5C7', display: 'block' }} className="animate-pulse" />
-            <span style={{ 
-              background: 'rgba(0,229,199,0.1)', 
-              border: '0.5px solid rgba(0,229,199,0.3)', 
-              color: '#00E5C7', 
-              fontFamily: 'Inter, sans-serif', 
-              fontWeight: 500, 
-              fontSize: 11, 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.1em',
-              padding: '4px 10px',
-              borderRadius: 4
-            }}>
-              LIVE DEMO
-            </span>
+        <div style={{ width: '55%', background: '#0A0A0F', borderRight: '0.5px solid #1E1E30', padding: '64px 56px', position: 'relative' }}>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 11, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            SANDBOX RENTAL
+          </div>
+          
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 52, color: '#F4F4F8', lineHeight: 1.1, marginTop: 12, marginBottom: 0 }}>
+            The real n8n.<br />
+            Yours for an hour.
+          </h1>
+          
+          <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 17, color: '#6B7280', lineHeight: 1.6, marginTop: 24, maxWidth: 448 }}>
+            A live n8n instance spins up in 90 seconds. Full editor. Real credentials. Build anything. Auto-destroyed when time is up.
+          </p>
+          
+          <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[
+              "Full n8n editor — not a demo, the real thing",
+              "400+ integrations available immediately",
+              "Add your own API keys inside n8n Settings",
+              "Export your workflows before time runs out",
+              "Isolated Docker container — completely private",
+              "Auto-destroyed at expiry, no cleanup needed"
+            ].map((text, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,229,199,0.1)', border: '0.5px solid rgba(0,229,199,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                  <CheckIcon />
+                </div>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, color: '#9CA3AF' }}>{text}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Bottom strip */}
-          <div style={{ 
-            position: 'absolute', bottom: 0, left: 0, right: 0, 
-            background: 'rgba(10,10,15,0.9)', 
-            backdropFilter: 'blur(8px)', 
-            padding: '12px 20px', 
-            zIndex: 10,
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 2,
-            pointerEvents: 'none'
-          }}>
-            <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280' }}>Your sandbox gets this workflow pre-installed.</p>
-            <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280' }}>Modify it, break it, rebuild it. Destroyed at expiry.</p>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, padding: '32px 56px' }}>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: '#3A3A4A' }}>
+              Built on n8n v1 · Docker isolated · Traefik SSL
+            </span>
           </div>
         </div>
 
         {/* RIGHT PANEL */}
-        <div className="flex-1 w-full lg:w-[45%] flex flex-col" style={{ background: '#0D0D14', overflowY: 'auto' }}>
-          <div style={{ padding: '48px 40px', maxWidth: 560, margin: '0 auto', width: '100%' }}>
-            
-            {/* Top section */}
-            <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 12, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-              n8n sandbox rental
-            </p>
-            <h1 style={{ fontFamily: '"Syne", sans-serif', fontWeight: 800, fontSize: 36, color: '#F4F4F8', marginBottom: 6, lineHeight: 1.1 }}>
-              Live instance in
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 40 }}>
-              <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 800, fontSize: 48, color: '#00E5C7', lineHeight: 1 }}>
-                {countdown > 0 ? countdown : '90s'}
+        <div style={{ width: '45%', background: '#0D0D14', padding: '48px 40px', overflowY: 'auto' }}>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, color: '#6B7280' }}>
+            Ready in
+          </div>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 32, color: '#F4F4F8', marginTop: 4 }}>
+            90 seconds
+          </div>
+
+          <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column' }}>
+            {TIERS.map(tier => {
+              const selected = selectedTier === tier.key;
+              return (
+                <div 
+                  key={tier.key} 
+                  onClick={() => setSelectedTier(tier.key as TierKey)}
+                  style={{
+                    height: 68, borderBottom: '0.5px solid #1E1E30', cursor: 'pointer', transition: '150ms all',
+                    borderLeft: selected ? '2px solid #7C3AED' : 'none',
+                    paddingLeft: selected ? 16 : 18,
+                    paddingRight: 16,
+                    background: selected ? 'rgba(124,58,237,0.04)' : 'transparent',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}
+                  className={!selected ? "hover:bg-[rgba(255,255,255,0.02)]" : ""}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, color: '#F4F4F8' }}>{tier.name}</span>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: '#6B7280', marginTop: 4 }}>{tier.spec}</span>
+                  </div>
+                  <div style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, fontSize: 20, color: '#F4F4F8' }}>{tier.price}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+            {['n8n latest', 'isolated', 'instant SSL'].map((pill, i) => (
+              <span key={i} style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 11, color: '#6B7280', background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 9999, padding: '4px 12px' }}>
+                {pill}
               </span>
-              {countdown <= 0 && <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, color: '#9CA3AF' }}>seconds</span>}
+            ))}
+          </div>
+
+          <button
+            onClick={user ? handleCheckout : handleSignIn}
+            disabled={checkoutLoading}
+            style={{ 
+              marginTop: 32, width: '100%', height: 52, borderRadius: 8, background: '#7C3AED', border: 'none', cursor: 'pointer', transition: '150ms all', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            }}
+            className={!checkoutLoading ? "hover:bg-[#6D28D9]" : "opacity-80"}
+          >
+             {checkoutLoading ? (
+               <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, color: '#ffffff' }}>
+                  <Loader2 size={16} className="animate-spin" /> Provisioning...
+               </span>
+             ) : (
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 24px' }}>
+                 <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, color: '#ffffff' }}>Rent {getTierLabel(selectedTier)} — {getTierPriceLabel(selectedTier)}</span>
+                 <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>⌘↵</span>
+               </div>
+             )}
+          </button>
+
+          {!user && (
+            <div style={{ marginTop: 12, textAlign: 'center' }}>
+              <span onClick={handleSignIn} style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: '#7C3AED', cursor: 'pointer' }} className="hover:underline">
+                Sign in to track your sessions &rarr;
+              </span>
             </div>
+          )}
 
-            {/* Tier selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: 24 }}>
-              {(Object.keys(TIERS) as TierKey[]).map((tierKey) => {
-                const isSelected = selectedTier === tierKey;
-                const tier = TIERS[tierKey];
-                return (
-                  <button
-                    key={tierKey}
-                    onClick={() => setSelectedTier(tierKey)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      height: 64,
-                      background: isSelected ? 'rgba(124,58,237,0.06)' : 'transparent',
-                      borderBottom: '0.5px solid #1E1E30',
-                      borderLeft: isSelected ? '2px solid #7C3AED' : 'none',
-                      padding: isSelected ? '0 16px' : '0 16px',
-                      paddingLeft: isSelected ? 16 : 18,
-                      cursor: 'pointer',
-                      transition: 'all 150ms',
-                      textAlign: 'left'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 15, color: '#F4F4F8' }}>{tier.label}</span>
-                      <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280' }}>· {tier.duration}</span>
-                    </div>
-                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, fontSize: 18, color: '#F4F4F8' }}>{tier.price}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Specs pills */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
-              {['512MB RAM', 'n8n latest', 'isolated Docker'].map(spec => (
-                <span key={spec} style={{ 
-                  fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#6B7280', 
-                  background: '#13131F', border: '0.5px solid #1E1E30', 
-                  borderRadius: 9999, padding: '4px 12px' 
-                }}>
-                  {spec === '512MB RAM' && selectedTier !== 'spark' ? (selectedTier === 'pro' ? '2GB RAM' : '1GB RAM') : spec}
-                </span>
-              ))}
-            </div>
-
-            {/* Action button */}
-            <button
-              onClick={handleCheckout}
-              disabled={checkoutLoading}
-              style={{
-                width: '100%',
-                height: 52,
-                borderRadius: 8,
-                background: '#7C3AED',
-                border: 'none',
-                color: '#fff',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: 15,
-                cursor: checkoutLoading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 150ms',
-                gap: 8,
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => { if(!checkoutLoading) e.currentTarget.style.background = '#6D28D9'; }}
-              onMouseLeave={(e) => { if(!checkoutLoading) e.currentTarget.style.background = '#7C3AED'; }}
-            >
-              {checkoutLoading ? (
-                <><Loader2 size={18} className="animate-spin" /> Provisioning...</>
-              ) : (
-                <>
-                  Rent {TIERS[selectedTier].label} — {TIERS[selectedTier].price}
-                  <span style={{ position: 'absolute', right: 16, fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>⌘↵</span>
-                </>
-              )}
-            </button>
-            <p style={{ textAlign: 'center', marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#6B7280' }}>
-              No account needed to browse. Payment via LemonSqueezy.
-            </p>
-
-            {!user && (
-              <p 
-                onClick={() => navigate('/auth', { state: { returnTo: '/sandbox' } })}
-                style={{ textAlign: 'center', marginTop: 16, fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#7C3AED', cursor: 'pointer' }}
-              >
-                Sign in to save your session history →
-              </p>
-            )}
-
-            <div style={{ height: '0.5px', background: '#1E1E30', width: '100%', margin: '32px 0' }} />
-
-            {/* FAQ */}
+          <div style={{ marginTop: 40, borderTop: '0.5px solid #1E1E30', paddingTop: 32 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div>
-                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', marginBottom: 6 }}>What's inside?</h4>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>
-                  Full n8n instance. Your credentials. Pre-installed demo workflow. Destroy early from dashboard.
+                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', margin: 0 }}>What can I do inside?</h4>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 1.5, margin: '4px 0 0 0' }}>
+                  Everything n8n supports. Connect APIs, build AI agents, run workflows, manage credentials. It's a full instance.
                 </p>
               </div>
               <div>
-                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', marginBottom: 6 }}>What happens at expiry?</h4>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>
-                  Container destroyed. Workflows deleted. Export before expiry.
+                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', margin: 0 }}>What happens when it expires?</h4>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 1.5, margin: '4px 0 0 0' }}>
+                  Container destroyed. Export your workflows from n8n <strong>Settings &rarr; Export</strong> before time runs out.
                 </p>
               </div>
               <div>
-                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', marginBottom: 6 }}>Can I use OpenAI/Claude inside?</h4>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>
-                  Yes. Add credentials in n8n Settings → Credentials.
+                <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', margin: 0 }}>Can I extend time?</h4>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 1.5, margin: '4px 0 0 0' }}>
+                  Yes. From your dashboard before expiry.
                 </p>
               </div>
             </div>
-
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
