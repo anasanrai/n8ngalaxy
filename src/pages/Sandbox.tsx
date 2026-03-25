@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Webhook, Globe, Sparkles, Mail } from 'lucide-react';
 import {
@@ -153,6 +153,7 @@ export default function Sandbox() {
       const expiresAt = new Date(Date.now() + TIER_DURATION_MS[selectedTier]).toISOString();
       const { data: session, error } = await supabase
         .from('sandbox_sessions')
+        // @ts-expect-error type inference failure
         .insert({
           user_id: user.id,
           tier: selectedTier,
@@ -170,7 +171,7 @@ export default function Sandbox() {
       const params = new URLSearchParams();
       params.set('checkout[email]', user.email || '');
       params.set('checkout[custom][user_id]', user.id);
-      params.set('checkout[custom][session_id]', session.id);
+      params.set('checkout[custom][session_id]', (session as any).id);
       params.set('checkout[custom][tier]', selectedTier);
 
       window.location.href = `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`;
@@ -272,7 +273,7 @@ export default function Sandbox() {
             </div>
 
             {/* Tier selector */}
-            <div style={{ display: 'flex', flexDirection: 'col', width: '100%', marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: 24 }}>
               {(Object.keys(TIERS) as TierKey[]).map((tierKey) => {
                 const isSelected = selectedTier === tierKey;
                 const tier = TIERS[tierKey];
@@ -375,7 +376,7 @@ export default function Sandbox() {
             <div style={{ height: '0.5px', background: '#1E1E30', width: '100%', margin: '32px 0' }} />
 
             {/* FAQ */}
-            <div style={{ display: 'flex', flexDirection: 'col', gap: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div>
                 <h4 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8', marginBottom: 6 }}>What's inside?</h4>
                 <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>

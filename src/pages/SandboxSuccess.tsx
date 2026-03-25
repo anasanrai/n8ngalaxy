@@ -165,7 +165,7 @@ export default function SandboxSuccess() {
       
       <main className="flex-1 flex" style={status === 'polling' || status === 'failed' || status === 'timeout' ? { alignItems: 'center', justifyContent: 'center' } : {}}>
         {status === 'polling' && (
-          <div style={{ display: 'flex', flexDirection: 'col', alignItems: 'center', width: '100%', maxWidth: 480, margin: '0 auto', background: '#0A0A0F', padding: 40, borderRadius: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 480, margin: '0 auto', background: '#0A0A0F', padding: 40, borderRadius: 12 }}>
             <div style={{ width: '100%', marginBottom: 32, minHeight: 180 }}>
               {TERMINAL_LINES.slice(0, visibleLines).map((line, i) => (
                 <div key={i} style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: line.color, marginBottom: 8, display: 'flex' }}>

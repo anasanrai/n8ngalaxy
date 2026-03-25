@@ -170,7 +170,7 @@ export default function Marketplace() {
               const price = t.price_cents > 0 ? `$${(t.price_cents / 100).toFixed(2)}` : 'Free';
               const priceColor = t.price_cents > 0 ? '#F4F4F8' : '#00E5C7';
               
-              const nodesApproxCount = t.tools_used && t.tools_used.length > 0 ? t.tools_used.length + 3 : 5;
+              const nodesApproxCount = (t as any).tools_used && (t as any).tools_used.length > 0 ? (t as any).tools_used.length + 3 : 5;
 
               return (
                 <div 
@@ -208,9 +208,9 @@ export default function Marketplace() {
                     {t.description}
                   </p>
                   
-                  {t.tools_used && t.tools_used.length > 0 && (
+                  {(t as any).tools_used && (t as any).tools_used.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 12 }}>
-                      {t.tools_used.slice(0, 4).map(tool => (
+                      {(t as any).tools_used.slice(0, 4).map((tool: string) => (
                         <span key={tool} style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 4, padding: '2px 6px', fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>
                           {tool}
                         </span>
