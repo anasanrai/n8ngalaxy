@@ -1,21 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Webhook, Globe, Sparkles, Mail } from 'lucide-react';
-import {
-  ReactFlow,
-  Background,
-  BackgroundVariant,
-  MarkerType,
-  Handle,
-  Position,
-  useNodesState,
-  useEdgesState,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-
+import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import TopBar from '../components/layout/TopBar';
+import DemoWorkflowCanvas from '../components/canvas/DemoWorkflowCanvas';
 
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
@@ -40,79 +29,7 @@ const TIERS: Record<TierKey, { label: string; duration: string; price: string }>
   pro:      { label: 'Pro',      duration: '1 week',  price: '$29' },
 };
 
-// --- Custom Nodes ---
-const WebhookNode = () => (
-  <div style={{ background: '#13131F', border: '0.5px solid #7C3AED', borderRadius: 8, width: 200, padding: 12 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <Webhook size={14} color="#7C3AED" />
-      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8' }}>Webhook Trigger</span>
-    </div>
-    <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>POST /webhook/leads</div>
-    <Handle type="source" position={Position.Right} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-  </div>
-);
 
-const HttpNode = () => (
-  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: 12 }}>
-    <Handle type="target" position={Position.Left} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <Globe size={14} color="#F4F4F8" />
-      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8' }}>HTTP Request</span>
-    </div>
-    <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>Enrich lead data</div>
-    <Handle type="source" position={Position.Right} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-  </div>
-);
-
-const AiNode = () => (
-  <div style={{ background: '#13131F', border: '0.5px solid rgba(124,58,237,0.6)', borderRadius: 8, padding: 12, boxShadow: '0 0 12px rgba(124,58,237,0.15)' }}>
-    <Handle type="target" position={Position.Left} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <Sparkles size={14} color="#7C3AED" />
-      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#7C3AED' }}>AI Agent</span>
-    </div>
-    <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>claude-sonnet-4</div>
-    <Handle type="source" position={Position.Right} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-  </div>
-);
-
-const GmailNode = () => (
-  <div style={{ background: '#13131F', border: '0.5px solid #1E1E30', borderRadius: 8, padding: 12 }}>
-    <Handle type="target" position={Position.Left} style={{ background: '#00E5C7', width: 8, height: 8, border: 'none' }} />
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <Mail size={14} color="#F4F4F8" />
-      <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, fontSize: 13, color: '#F4F4F8' }}>Gmail</span>
-    </div>
-    <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#6B7280' }}>Send enriched email</div>
-  </div>
-);
-
-const nodeTypes = {
-  webhook: WebhookNode,
-  http: HttpNode,
-  ai: AiNode,
-  gmail: GmailNode,
-};
-
-const initialNodes = [
-  { id: '1', position: { x: 80, y: 200 }, type: 'webhook', data: {} },
-  { id: '2', position: { x: 360, y: 120 }, type: 'http', data: {} },
-  { id: '3', position: { x: 360, y: 280 }, type: 'ai', data: {} },
-  { id: '4', position: { x: 620, y: 200 }, type: 'gmail', data: {} },
-];
-
-const edgeProps = {
-  animated: true,
-  style: { stroke: '#7C3AED', strokeWidth: 1.5, strokeDasharray: '4 4' },
-  markerEnd: { type: MarkerType.ArrowClosed, color: '#7C3AED' },
-};
-
-const initialEdges = [
-  { id: 'e1-2', source: '1', target: '2', ...edgeProps },
-  { id: 'e1-3', source: '1', target: '3', ...edgeProps },
-  { id: 'e2-4', source: '2', target: '4', ...edgeProps },
-  { id: 'e3-4', source: '3', target: '4', ...edgeProps },
-];
 
 
 export default function Sandbox() {
@@ -131,9 +48,6 @@ export default function Sandbox() {
     }, 12); // fast countdown for aesthetic
     return () => clearInterval(timer);
   }, [countdown]);
-
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
   async function handleCheckout() {
     if (!user) {
@@ -204,25 +118,10 @@ export default function Sandbox() {
         
         {/* LEFT PANEL */}
         <div style={{ width: '55%', position: 'relative', background: '#0A0A0F', borderRight: '0.5px solid #1E1E30' }} className="hidden lg:block relative">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            nodesDraggable={false}
-            panOnDrag={true}
-            zoomOnScroll={true}
-            minZoom={0.5}
-            maxZoom={1.5}
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background gap={24} size={1} color="#1E1E30" variant={BackgroundVariant.Dots} />
-          </ReactFlow>
-          
+          <DemoWorkflowCanvas />
+
           {/* Top-left LIVE DEMO badge */}
-          <div style={{ position: 'absolute', top: 32, left: 32, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10 }}>
+          <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', alignItems: 'center', gap: 8, zIndex: 10, pointerEvents: 'none' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E5C7', display: 'block' }} className="animate-pulse" />
             <span style={{ 
               background: 'rgba(0,229,199,0.1)', 
@@ -249,7 +148,8 @@ export default function Sandbox() {
             zIndex: 10,
             display: 'flex', 
             flexDirection: 'column', 
-            gap: 2 
+            gap: 2,
+            pointerEvents: 'none'
           }}>
             <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280' }}>Your sandbox gets this workflow pre-installed.</p>
             <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#6B7280' }}>Modify it, break it, rebuild it. Destroyed at expiry.</p>
