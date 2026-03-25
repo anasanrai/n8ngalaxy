@@ -2,16 +2,17 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { openPaddleCheckout } from '../lib/paddle';
 import { GitBranch, Check, ShieldCheck, Loader2 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import type { Template, Purchase } from '../types';
 
-const TEMPLATE_VARIANT_MAP: Record<string, string> = {
-  'real-estate-lead-capture': import.meta.env.VITE_TEMPLATE_VARIANT_REAL_ESTATE,
-  'stripe-quickbooks-sync':   import.meta.env.VITE_TEMPLATE_VARIANT_QUICKBOOKS,
-  'ai-google-review-responder': import.meta.env.VITE_TEMPLATE_VARIANT_GOOGLE_REVIEW,
-}
+const PADDLE_TEMPLATE_PRICES: Record<string, string> = {
+  'real-estate-lead-capture':    import.meta.env.VITE_PADDLE_TEMPLATE_REAL_ESTATE,
+  'stripe-quickbooks-sync':      import.meta.env.VITE_PADDLE_TEMPLATE_QUICKBOOKS,
+  'ai-google-review-responder':  import.meta.env.VITE_PADDLE_TEMPLATE_GOOGLE_REVIEW,
+};
 
 export default function TemplatePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -50,42 +51,43 @@ export default function TemplatePage() {
     enabled: !!user && !!template,
   });
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (!user) {
-      navigate('/auth', { state: { returnTo: `/template/${template?.slug}` } })
-      return
+      navigate('/auth', { state: { returnTo: `/template/${template?.slug}` } });
+      return;
     }
 
     if (purchase) {
       if (purchase.download_url && new Date(purchase.download_expires_at!) > new Date()) {
-        window.open(purchase.download_url, '_blank')
+        window.open(purchase.download_url, '_blank');
       } else {
-        alert('Download link expired. Contact support to re-download.')
+        alert('Download link expired. Contact support to re-download.');
       }
-      return
+      return;
     }
 
-    const variantId = TEMPLATE_VARIANT_MAP[template?.slug || ''] 
-      || template?.lemonsqueezy_product_id
-    
-    if (!variantId) {
-      alert('Product ID not configured for checkout.')
-      return
+    const priceId = PADDLE_TEMPLATE_PRICES[template?.slug || ''];
+    if (!priceId) {
+      alert('Price not configured for this template');
+      return;
     }
 
-    const params = new URLSearchParams({
-      'checkout[email]': user.email || '',
-      'checkout[name]': profile?.full_name || '',
-      'checkout[custom][user_id]': user.id,
-      'checkout[custom][template_id]': template?.id || '',
-    })
-    
-    const isTestMode = import.meta.env.VITE_LEMONSQUEEZY_TEST_MODE === 'true';
-    const storeSlug = isTestMode ? 'n8ngalaxy' : 'n8ngalaxy';
-    
-    window.location.href = 
-      `https://${storeSlug}.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}${isTestMode ? '&test=true' : ''}`;
-  }
+    try {
+      await openPaddleCheckout({
+        priceId,
+        userId: user.id,
+        userEmail: user.email || '',
+        userName: profile?.full_name || '',
+        customData: {
+          user_id: user.id,
+          template_id: template?.id || '',
+          type: 'template',
+        },
+      });
+    } catch (err) {
+      console.error('Checkout error:', err);
+    }
+  };
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {

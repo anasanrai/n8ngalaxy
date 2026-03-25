@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { openPaddleCheckout } from '../lib/paddle';
 import TopBar from '../components/layout/TopBar';
 import DemoWorkflowCanvas from '../components/canvas/DemoWorkflowCanvas';
 
 type TierKey = 'spark' | 'explorer' | 'builder' | 'pro';
 
-const VARIANT_IDS: Record<string, string> = {
-  spark:    import.meta.env.VITE_SANDBOX_VARIANT_SPARK    || '',
-  explorer: import.meta.env.VITE_SANDBOX_VARIANT_EXPLORER || '',
-  builder:  import.meta.env.VITE_SANDBOX_VARIANT_BUILDER  || '',
-  pro:      import.meta.env.VITE_SANDBOX_VARIANT_PRO      || '',
+const PADDLE_PRICE_IDS: Record<string, string> = {
+  spark:    import.meta.env.VITE_PADDLE_SANDBOX_SPARK    || '',
+  explorer: import.meta.env.VITE_PADDLE_SANDBOX_EXPLORER || '',
+  builder:  import.meta.env.VITE_PADDLE_SANDBOX_BUILDER  || '',
+  pro:      import.meta.env.VITE_PADDLE_SANDBOX_PRO      || '',
 };
 
 const TIER_DURATION_MS: Record<string, number> = {
@@ -33,7 +34,7 @@ const TIERS: Record<TierKey, { label: string; duration: string; price: string }>
 
 
 export default function Sandbox() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   const [selectedTier, setSelectedTier] = useState<TierKey>('explorer');
@@ -50,21 +51,17 @@ export default function Sandbox() {
   }, [countdown]);
 
   async function handleCheckout() {
-    if (!user) {
-      navigate('/auth', { state: { returnTo: '/sandbox' } });
+    if (!user || !selectedTier) return;
+    if (!PADDLE_PRICE_IDS[selectedTier]) {
+      alert('Configuration error: missing price ID for ' + selectedTier);
       return;
     }
-    
-    const variantId = VARIANT_IDS[selectedTier];
-    if (!variantId) {
-      alert(`Configuration error: no variant ID for ${selectedTier}. Check env vars.`);
-      return;
-    }
-
     setCheckoutLoading(true);
-    
     try {
-      const expiresAt = new Date(Date.now() + TIER_DURATION_MS[selectedTier]).toISOString();
+      const expiresAt = new Date(
+        Date.now() + TIER_DURATION_MS[selectedTier]
+      ).toISOString();
+
       const { data: session, error } = await supabase
         .from('sandbox_sessions')
         // @ts-expect-error type inference failure
@@ -79,21 +76,27 @@ export default function Sandbox() {
         .single();
 
       if (error || !session) {
-        throw error || new Error('No session returned');
+        alert('Error creating session: ' + error?.message);
+        setCheckoutLoading(false);
+        return;
       }
 
-      const params = new URLSearchParams();
-      params.set('checkout[email]', user.email || '');
-      params.set('checkout[custom][user_id]', user.id);
-      params.set('checkout[custom][session_id]', (session as any).id);
-      params.set('checkout[custom][tier]', selectedTier);
-
-      const isTestMode = import.meta.env.VITE_LEMONSQUEEZY_TEST_MODE === 'true';
-      const storeSlug = isTestMode ? 'n8ngalaxy' : 'n8ngalaxy';
-      window.location.href = `https://${storeSlug}.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}${isTestMode ? '&test=true' : ''}`;
+      await openPaddleCheckout({
+        priceId: PADDLE_PRICE_IDS[selectedTier],
+        userId: user.id,
+        userEmail: user.email || '',
+        userName: profile?.full_name || '',
+        customData: {
+          user_id: user.id,
+          session_id: (session as any).id,
+          tier: selectedTier,
+          type: 'sandbox',
+        },
+      });
+      setCheckoutLoading(false);
     } catch (err) {
-      console.error(err);
-      alert(`Checkout error: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('Checkout error:', err);
+      alert('Checkout error: ' + err);
       setCheckoutLoading(false);
     }
   }
