@@ -5,7 +5,13 @@ import { useAuth } from '../hooks/useAuth';
 import { GitBranch, Check, ShieldCheck, Loader2 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
-import type { Template } from '../types';
+import type { Template, Purchase } from '../types';
+
+const TEMPLATE_VARIANT_MAP: Record<string, string> = {
+  'real-estate-lead-capture': import.meta.env.VITE_TEMPLATE_VARIANT_REAL_ESTATE,
+  'stripe-quickbooks-sync':   import.meta.env.VITE_TEMPLATE_VARIANT_QUICKBOOKS,
+  'ai-google-review-responder': import.meta.env.VITE_TEMPLATE_VARIANT_GOOGLE_REVIEW,
+}
 
 export default function TemplatePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -28,49 +34,55 @@ export default function TemplatePage() {
     enabled: !!slug,
   });
 
-  const { data: hasPurchased } = useQuery({
-    queryKey: ['purchased', user?.id, template?.id],
+  const { data: purchase } = useQuery({
+    queryKey: ['purchase', template?.id, user?.id],
     queryFn: async () => {
-      if (!user || !template) return false;
-      const { data, error } = await supabase
+      if (!user || !template) return null;
+      const { data } = await supabase
         .from('purchases')
-        .select('id')
+        .select('*')
         .eq('user_id', user.id)
         .eq('template_id', template.id)
-        .limit(1);
+        .maybeSingle();
       
-      return !error && data && data.length > 0;
+      return data as Purchase | null;
     },
     enabled: !!user && !!template,
   });
 
-  const handlePurchase = () => {
+  const handleBuy = () => {
     if (!user) {
-      navigate('/auth', { state: { returnTo: `/template/${slug}` } });
-      return;
+      navigate('/auth', { state: { returnTo: `/template/${template?.slug}` } })
+      return
     }
 
-    if (template?.price_cents === 0 || hasPurchased) {
-      // Free download logic placeholder
-      alert('Download started (impl coming soon)');
-      return;
+    if (purchase) {
+      if (purchase.download_url && new Date(purchase.download_expires_at!) > new Date()) {
+        window.open(purchase.download_url, '_blank')
+      } else {
+        alert('Download link expired. Contact support to re-download.')
+      }
+      return
     }
 
-    // LemonSqueezy checkout URL construction
-    if (template?.lemonsqueezy_product_id) {
-      const url = new URL(`https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${template.lemonsqueezy_product_id}`);
-      if (user.email) url.searchParams.set('checkout[email]', user.email);
-      if (profile?.full_name) url.searchParams.set('checkout[name]', profile.full_name);
-      
-      // Custom metadata for webhook processing
-      url.searchParams.set('checkout[custom][user_id]', user.id);
-      url.searchParams.set('checkout[custom][template_id]', template.id);
-
-      window.location.href = url.toString();
-    } else {
-      alert('Product ID not configured for checkout.');
+    const variantId = TEMPLATE_VARIANT_MAP[template?.slug || ''] 
+      || template?.lemonsqueezy_product_id
+    
+    if (!variantId) {
+      alert('Product ID not configured for checkout.')
+      return
     }
-  };
+
+    const params = new URLSearchParams({
+      'checkout[email]': user.email || '',
+      'checkout[name]': profile?.full_name || '',
+      'checkout[custom][user_id]': user.id,
+      'checkout[custom][template_id]': template?.id || '',
+    })
+    
+    window.location.href = 
+      `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`
+  }
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
@@ -236,16 +248,16 @@ export default function TemplatePage() {
 
               <div className="w-full pt-4">
                 <button
-                  onClick={handlePurchase}
+                  onClick={handleBuy}
                   className={`w-full h-[52px] rounded-input font-sans font-semibold text-[16px] transition-colors cursor-pointer flex items-center justify-center ${
-                    hasPurchased 
+                    purchase 
                       ? 'bg-surface border border-border text-text-primary hover:border-primary' 
                       : template.price_cents === 0 
                         ? 'bg-accent hover:bg-accent-dim text-background' 
                         : 'bg-primary hover:bg-primary-hover text-white'
                   }`}
                 >
-                  {hasPurchased ? 'Download Again' : template.price_cents === 0 ? 'Download Free' : 'Buy Now'}
+                  {purchase ? 'Download Again' : template.price_cents === 0 ? 'Download Free' : 'Buy Now'}
                 </button>
                 <div className="flex items-center justify-center gap-1.5 mt-3 text-text-tertiary">
                   <ShieldCheck size={12} />

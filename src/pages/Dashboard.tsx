@@ -46,22 +46,23 @@ export default function Dashboard() {
     queryKey: ['sandboxes', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('Not logged in');
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('sandbox_sessions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
       return data as SandboxSession[];
     },
     enabled: !!user?.id && activeTab === 'sandboxes',
   });
 
-  const handleDownload = async (purchaseId: string) => {
-    console.log(purchaseId);
-    // Basic stub, will connect to storage later
-    alert('Generating signed JSON download... (impl coming soon)');
+  const handleDownload = (purchase: Purchase) => {
+    if (purchase.download_url && new Date(purchase.download_expires_at!) > new Date()) {
+      window.open(purchase.download_url, '_blank')
+    } else {
+      alert('Download link expired. Contact hello@n8ngalaxy.com')
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -157,7 +158,7 @@ export default function Dashboard() {
                     </div>
                     
                     <button 
-                      onClick={() => handleDownload(p.id)}
+                      onClick={() => handleDownload(p)}
                       className="h-[36px] px-4 shrink-0 bg-surface border border-border hover:border-primary/50 text-text-primary hover:text-primary font-sans font-medium text-[13px] rounded-input transition-colors flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
                     >
                       <Download size={14} /> Download
