@@ -80,8 +80,11 @@ export default function TemplatePage() {
       'checkout[custom][template_id]': template?.id || '',
     })
     
+    const isTestMode = import.meta.env.VITE_LEMONSQUEEZY_TEST_MODE === 'true';
+    const storeSlug = isTestMode ? 'n8ngalaxy' : 'n8ngalaxy';
+    
     window.location.href = 
-      `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`
+      `https://${storeSlug}.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}${isTestMode ? '&test=true' : ''}`;
   }
 
   const getCategoryColor = (cat: string) => {

@@ -174,7 +174,9 @@ export default function Sandbox() {
       params.set('checkout[custom][session_id]', (session as any).id);
       params.set('checkout[custom][tier]', selectedTier);
 
-      window.location.href = `https://n8ngalaxy.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}`;
+      const isTestMode = import.meta.env.VITE_LEMONSQUEEZY_TEST_MODE === 'true';
+      const storeSlug = isTestMode ? 'n8ngalaxy' : 'n8ngalaxy';
+      window.location.href = `https://${storeSlug}.lemonsqueezy.com/checkout/buy/${variantId}?${params.toString()}${isTestMode ? '&test=true' : ''}`;
     } catch (err) {
       console.error(err);
       alert(`Checkout error: ${err instanceof Error ? err.message : String(err)}`);
