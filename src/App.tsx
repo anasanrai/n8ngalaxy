@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/authStore';
+import { supabase } from './lib/supabase';
 import { Spinner } from './components/ui/Spinner';
 
 import Home from './pages/Home';
@@ -29,6 +30,18 @@ function App() {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          useAuthStore.getState().initialize()
+          window.history.replaceState(null, '', window.location.pathname)
+        }
+      })
+    }
+  }, [])
 
   if (loading) {
     return (
